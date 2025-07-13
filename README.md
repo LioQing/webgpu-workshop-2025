@@ -1,0 +1,1 @@
+# WebGPU Summer Workshop: Synthetic Animation in the Browser
