@@ -10,6 +10,17 @@
     <div class="back-button-container">
         <button class="nav-button back-button" onclick="window.location.href='../index.html'">← Back</button>
     </div>
+    <div class="controls-container">
+        <div class="circle-controls">
+            <label for="num-circles-input">Number of Circles:</label>
+            <input type="number" id="num-circles-input" min="1" max="10000" value="128">
+            <button id="apply-circles" class="apply-button">Apply</button>
+        </div>
+        <div class="gravity-info">
+            <div id="gravity-status">Gravity: Downward</div>
+            <div class="gravity-instruction">Press SPACE to reverse gravity</div>
+        </div>
+    </div>
     <canvas id="canvas"></canvas>
     <div id="error-toast" class="error-toast"></div>
     <script type="module" src="particles.js"></script>

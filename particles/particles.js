@@ -10,6 +10,7 @@ import {
     initElements
 } from './utils.js';
 
+// WebGPU variables
 let renderPipeline; // The render pipeline for drawing the circles
 let computePipeline; // The compute pipeline for moving the circles
 let vertexBuffer; // The vertex buffer containing circle geometry
@@ -21,12 +22,29 @@ let bindGroup; // The bind group for passing uniforms to the shader
 let computeBindGroup; // The bind group for the compute pipeline
 
 // Circle configuration
-const NUM_CIRCLES = 128;
+let num_circles = 128;
 const CIRCLE_RADIUS = 5;
 const CIRCLE_SEGMENTS = 16; // Number of triangles to approximate a circle
 const CIRCLE_SPAWN_RADIUS = 1.5 * CIRCLE_RADIUS; // Minimum distance between circles
 const SPEED = 60.0; // Movement speed in pixels per second
 let circles = []; // Array to store circle data (position, color, velocity)
+
+// Gravity state
+let isGravityReversed = false;
+
+// Update gravity status display
+function updateGravityDisplay() {
+    const gravityStatus = document.getElementById('gravity-status');
+    if (gravityStatus) {
+        if (isGravityReversed) {
+            gravityStatus.textContent = 'Gravity: Upward';
+            gravityStatus.classList.add('reversed');
+        } else {
+            gravityStatus.textContent = 'Gravity: Downward';
+            gravityStatus.classList.remove('reversed');
+        }
+    }
+}
 
 // Resize the canvas and update buffers
 function resizeCanvas() {
@@ -49,7 +67,7 @@ function createUniformsBuffer() {
     try {
         uniformsBuffer = gpuState.device.createBuffer({
             label: 'Uniform buffer',
-            size: 2 * 4, // resolution (width, height) (2 floats)
+            size: 4 * 4, // resolution (width, height) + is_gravity_reversed + padding (4 floats total)
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
         
@@ -64,8 +82,13 @@ function createUniformsBuffer() {
 // Update uniforms buffer with current canvas resolution
 function updateUniformsBuffer() {
     try {
-        const resolution = new Float32Array([htmlState.canvas.width, htmlState.canvas.height]);
-        gpuState.device.queue.writeBuffer(uniformsBuffer, 0, resolution);
+        const uniformData = new Float32Array([
+            htmlState.canvas.width, 
+            htmlState.canvas.height,
+            isGravityReversed ? 1.0 : 0.0,
+            0.0
+        ]);
+        gpuState.device.queue.writeBuffer(uniformsBuffer, 0, uniformData);
     } catch (error) {
         showErrorToast(`Error updating uniform buffer: ${error.message}`);
         console.error('Uniform buffer update error:', error);
@@ -135,7 +158,7 @@ function generateCircles() {
 
     circles = [];
     
-    for (let i = 0; i < NUM_CIRCLES; i++) {
+    for (let i = 0; i < num_circles; i++) {
         let x, y, gridX, gridY;
         do {
             gridX = Math.floor(Math.random() * occupied.length);
@@ -166,7 +189,7 @@ function createCircleBuffer() {
     try {
         circleBuffer = gpuState.device.createBuffer({
             label: 'Circle buffer',
-            size: NUM_CIRCLES * 12 * 4, // position (2 floats) + velocity (2 floats) + acceleration (2 floats) + padding (2) + color (3 floats) + padding (1)
+            size: num_circles * 12 * 4, // position (2 floats) + velocity (2 floats) + acceleration (2 floats) + padding (2) + color (3 floats) + padding (1)
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
         });
 
@@ -184,7 +207,7 @@ function updateCircleBuffer() {
     try {
         const circleData = [];
         
-        for (let i = 0; i < NUM_CIRCLES; i++) {
+        for (let i = 0; i < num_circles; i++) {
             const circle = circles[i];
             circleData.push(circle.x, circle.y, circle.vx, circle.vy, circle.ax, circle.ay, 0, 0, circle.r, circle.g, circle.b, 0);
         }
@@ -302,23 +325,6 @@ async function createRenderPipeline() {
                 topology: 'triangle-list'
             }
         });
-
-        // Create render bind group
-        const bindGroupLayout = renderPipeline.getBindGroupLayout(0);
-        bindGroup = gpuState.device.createBindGroup({
-            label: 'Circles bind group',
-            layout: bindGroupLayout,
-            entries: [
-                {
-                    binding: 0,
-                    resource: { buffer: uniformsBuffer }
-                },
-                {
-                    binding: 1,
-                    resource: { buffer: circleBuffer }
-                }
-            ]
-        });
     } catch (error) {
         showErrorToast(`Error creating render pipeline: ${error.message}`);
         console.error('Render pipeline creation error:', error);
@@ -353,6 +359,32 @@ async function createComputePipeline() {
                 entryPoint: 'main'
             }
         });
+    } catch (error) {
+        showErrorToast(`Error creating compute pipeline: ${error.message}`);
+        console.error('Compute pipeline creation error:', error);
+        throw error;
+    }
+}
+
+// Create bind groups for render and compute pipelines
+function createBindGroups() {
+    try {
+        // Create render bind group
+        const bindGroupLayout = renderPipeline.getBindGroupLayout(0);
+        bindGroup = gpuState.device.createBindGroup({
+            label: 'Circles bind group',
+            layout: bindGroupLayout,
+            entries: [
+                {
+                    binding: 0,
+                    resource: { buffer: uniformsBuffer }
+                },
+                {
+                    binding: 1,
+                    resource: { buffer: circleBuffer }
+                }
+            ]
+        });
 
         // Create compute bind group
         const computeBindGroupLayout = computePipeline.getBindGroupLayout(0);
@@ -375,8 +407,8 @@ async function createComputePipeline() {
             ]
         });
     } catch (error) {
-        showErrorToast(`Error creating compute pipeline: ${error.message}`);
-        console.error('Compute pipeline creation error:', error);
+        showErrorToast(`Error creating bind groups: ${error.message}`);
+        console.error('Bind group creation error:', error);
         throw error;
     }
 }
@@ -415,7 +447,7 @@ function runRenderShader() {
         // Draw instanced circles using indexed triangles
         // Each circle has CIRCLE_SEGMENTS triangles (3 indices each)
         const indicesPerCircle = CIRCLE_SEGMENTS * 3;
-        renderPass.drawIndexed(indicesPerCircle, NUM_CIRCLES);
+        renderPass.drawIndexed(indicesPerCircle, num_circles);
         
         // End render pass
         renderPass.end();
@@ -450,7 +482,7 @@ function runComputeShader(deltaTime) {
 
         // Dispatch compute shader
         const workgroupSize = 64;
-        const numWorkgroups = Math.ceil(NUM_CIRCLES / workgroupSize);
+        const numWorkgroups = Math.ceil(num_circles / workgroupSize);
         computePass.dispatchWorkgroups(numWorkgroups);
 
         // End compute pass
@@ -461,6 +493,37 @@ function runComputeShader(deltaTime) {
     } catch (error) {
         showErrorToast(`Compute shader error: ${error.message}`);
         console.error('Compute shader error:', error);
+    }
+}
+
+// Restart simulation with new number of circles
+async function restartSimulation(newNumCircles) {
+    try {
+        // Validate input
+        const numCircles = parseInt(newNumCircles);
+        if (isNaN(numCircles) || numCircles < 1 || numCircles > 1000) {
+            showErrorToast('Number of circles must be between 1 and 1000');
+            return;
+        }
+        
+        // Update the variable
+        num_circles = numCircles;
+        
+        // Destroy existing circle buffer
+        if (circleBuffer) {
+            circleBuffer.destroy();
+        }
+        
+        // Recreate circle buffer with new size
+        createCircleBuffer();
+        
+        // Recreate bind groups since buffer changed
+        createBindGroups();
+        
+        console.log(`Simulation restarted with ${num_circles} circles`);
+    } catch (error) {
+        showErrorToast(`Error restarting simulation: ${error.message}`);
+        console.error('Restart simulation error:', error);
     }
 }
 
@@ -491,6 +554,9 @@ async function init() {
         // Create compute pipeline
         await createComputePipeline();
         
+        // Create bind groups
+        createBindGroups();
+        
         // Start render loop
         update();
     } catch (error) {
@@ -517,8 +583,41 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add resize event listener
     window.addEventListener('resize', resizeCanvas);
 
+    // Add spacebar event listener for gravity reversal
+    document.addEventListener('keydown', (event) => {
+        if (event.code === 'Space') {
+            event.preventDefault();
+            isGravityReversed = !isGravityReversed;
+            updateUniformsBuffer();
+            updateGravityDisplay();
+        }
+    });
+
+    // Add event listeners for circle controls
+    const numCirclesInput = document.getElementById('num-circles-input');
+    const applyButton = document.getElementById('apply-circles');
+    
+    if (numCirclesInput && applyButton) {
+        applyButton.addEventListener('click', () => {
+            const newNumCircles = numCirclesInput.value;
+            restartSimulation(newNumCircles);
+        });
+        
+        // Allow applying with Enter key
+        numCirclesInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                const newNumCircles = numCirclesInput.value;
+                restartSimulation(newNumCircles);
+            }
+        });
+    }
+
     // Initialize canvas size
     resizeCanvas();
+    
+    // Initialize gravity display
+    updateGravityDisplay();
     
     // Initialize WebGPU
     init();

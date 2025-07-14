@@ -12,8 +12,8 @@ struct Circle {
 }
 
 struct VertexInput {
-    @location(0) position: vec2<f32>,      // Local circle vertex position
-    @builtin(instance_index) instanceIndex: u32,
+    @location(0) position: vec2<f32>,
+    @builtin(instance_index) instance_index: u32,
 }
 
 struct FragmentInput {
@@ -29,7 +29,7 @@ fn vs_main(input: VertexInput) -> FragmentInput {
     var out: FragmentInput;
     
     // Get circle data using instance index
-    let circle = circles[input.instanceIndex];
+    let circle = circles[input.instance_index];
     
     // Transform local vertex position to world position
     let worldPos = input.position + circle.position;

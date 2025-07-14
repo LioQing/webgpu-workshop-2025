@@ -1,5 +1,7 @@
 struct Uniforms {
     resolution: vec2<f32>,
+    is_gravity_reversed: u32,
+    padding: u32,
 }
 
 struct Circle {
@@ -13,12 +15,14 @@ struct Circle {
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var<storage, read_write> circles: array<Circle>;
-@group(0) @binding(2) var<uniform> deltaTime: f32;
+@group(0) @binding(2) var<uniform> delta_time: f32;
 
 const CIRCLE_RADIUS: f32 = 5.0;
 const INTER_EPISILON: f32 = 100.0;
 const INTER_SIGMA: f32 = CIRCLE_RADIUS * 8;
-const DAMPING: f32 = 0.998;
+const MAX_SPEED: f32 = 1000.0;
+const DAMPING: f32 = 0.999;
+const DAMP_FREE_SPEED: f32 = 100.0;
 const GRAVITY: f32 = 9.81 * 1000.0;
 
 @compute @workgroup_size(128)
@@ -42,44 +46,42 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             continue; // Skip self
         }
         
-        let otherCircle = circles[i];
-        let offset = otherCircle.position - circle.position;
+        let other_circle = circles[i];
+        let offset = other_circle.position - circle.position;
         let direction = normalize(offset);
         let r = length(offset);
 
-        let interTerm = INTER_SIGMA / r;
-        let weakForce = interTerm * interTerm * interTerm;
-        let strongForce = weakForce * weakForce;
+        let inter_term = INTER_SIGMA / r;
+        let weak_force = inter_term * inter_term * inter_term;
+        let strong_force = weak_force * weak_force;
 
-        let interForce = 4 * INTER_EPISILON * (strongForce - weakForce);
+        let inter_force = 4 * INTER_EPISILON * (strong_force - weak_force);
 
         if (r <= CIRCLE_RADIUS * 2.0) {
-            // Apply reaction force
-            let directionSpeed = dot(direction, circle.velocity);
-            let reactForce = -2 * directionSpeed * direction / deltaTime;
-            circle.acceleration += reactForce;
             continue;
         }
 
-        circle.acceleration -= direction * interForce;
+        circle.acceleration -= direction * inter_force;
     }
 
     // Apply gravity
-    circle.acceleration += vec2<f32>(0.0, GRAVITY) * deltaTime;
+    let gravity_direction = select(1.0, -1.0, uniforms.is_gravity_reversed != 0u);
+    circle.acceleration += vec2<f32>(0.0, GRAVITY * gravity_direction) * delta_time;
 
     // Apply acceleration to velocity
-    circle.velocity += circle.acceleration * deltaTime;
+    circle.velocity += circle.acceleration * delta_time;
 
     // Clamp velocity to prevent physics breaking
-    if (length(circle.velocity) > 1000.0) {
-        circle.velocity = normalize(circle.velocity) * 1000.0;
+    if (length(circle.velocity) > MAX_SPEED) {
+        circle.velocity = normalize(circle.velocity) * MAX_SPEED;
     }
 
-    // Dampen the velocity
-    circle.velocity *= DAMPING;
+    // Dampen the velocity depending on its current speed
+    circle.velocity *= DAMPING
+        + min((1.0 - DAMPING) / (1.0 + length(circle.velocity) - DAMP_FREE_SPEED), 1.0);
     
     // Update position using velocity and delta time
-    circle.position += circle.velocity * deltaTime;
+    circle.position += circle.velocity * delta_time;
     
     // Check boundaries and bounce
     // Left boundary
