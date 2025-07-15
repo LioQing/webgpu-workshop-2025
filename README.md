@@ -81,11 +81,11 @@ graph LR
     subgraph Application
     A[Create Pipeline] --> B[Create Buffer]
     end
-    subgraph "Render Pipeline"
+    subgraph Render Pipeline
     B --> C[Vertex Shader]
     C --> D[Fragment Shader]
     end
-    begin "Render Targets"
+    subgraph Render Targets
     D --> E[Screen]
     D --> F[Image]
     end
