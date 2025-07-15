@@ -67,7 +67,7 @@ function createUniformsBuffer() {
     try {
         uniformsBuffer = gpuState.device.createBuffer({
             label: 'Uniform buffer',
-            size: 4 * 4, // resolution (width, height) + is_gravity_reversed + padding (4 floats total)
+            size: 4 * 4, // resolution (width, height) (2 floats) + is_gravity_reversed (1 int) + padding (1 float)
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
         

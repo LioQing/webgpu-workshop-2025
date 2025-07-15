@@ -39,19 +39,6 @@ function createUniformsBuffer() {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
         
-        const bindGroupLayout = renderPipeline.getBindGroupLayout(0);
-        
-        bindGroup = gpuState.device.createBindGroup({
-            label: 'Uniform bind group',
-            layout: bindGroupLayout,
-            entries: [{
-                binding: 0,
-                resource: {
-                    buffer: uniformsBuffer
-                }
-            }]
-        });
-
         updateUniformsBuffer();
     } catch (error) {
         showErrorToast(`Error creating uniform buffer: ${error.message}`);
@@ -112,65 +99,31 @@ function updateVertexBuffer() {
     }
 }
 
-// Update function to render the triangle
-function update() {
+// Create bind group for render pipeline
+function createBindGroup() {
     try {
-        // Get current texture from canvas
-        const currentTexture = gpuState.context.getCurrentTexture();
+        const bindGroupLayout = renderPipeline.getBindGroupLayout(0);
         
-        // Create render pass descriptor
-        const renderPassDescriptor = {
-            label: 'Triangle render pass',
-            colorAttachments: [{
-                view: currentTexture.createView(),
-                clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-                loadOp: 'clear',
-                storeOp: 'store'
+        bindGroup = gpuState.device.createBindGroup({
+            label: 'Uniform bind group',
+            layout: bindGroupLayout,
+            entries: [{
+                binding: 0,
+                resource: {
+                    buffer: uniformsBuffer
+                }
             }]
-        };
-
-        // Create command encoder
-        const encoder = gpuState.device.createCommandEncoder({
-            label: 'Triangle command encoder'
         });
-
-        // Create render pass
-        const renderPass = encoder.beginRenderPass(renderPassDescriptor);
-        
-        // Set pipeline, bind group, and vertex buffer
-        renderPass.setPipeline(renderPipeline);
-        renderPass.setBindGroup(0, bindGroup);
-        renderPass.setVertexBuffer(0, vertexBuffer);
-        
-        // Draw triangle
-        renderPass.draw(3);
-        
-        // End render pass
-        renderPass.end();
-
-        // Submit commands
-        gpuState.device.queue.submit([encoder.finish()]);
-
-        // Request next frame
-        requestAnimationFrame(update);
     } catch (error) {
-        showErrorToast(`Render error: ${error.message}`);
-        console.error('Render error:', error);
-        setTimeout(() => {
-            requestAnimationFrame(update);
-        }, 100);
+        showErrorToast(`Error creating bind group: ${error.message}`);
+        console.error('Bind group creation error:', error);
+        throw error;
     }
 }
 
-// Initialize WebGPU
-async function init() {
+// Create render pipeline for triangle rendering
+async function createRenderPipeline() {
     try {
-        // Initialize device and context
-        await initDeviceAndContext();
-
-        // Configure context
-        configureContext();
-
         // Load WGSL shader code from file
         const response = await fetch('triangle.wgsl');
         if (!response.ok) {
@@ -220,12 +173,96 @@ async function init() {
                 topology: 'triangle-list'
             }
         });
+    } catch (error) {
+        showErrorToast(`Error creating render pipeline: ${error.message}`);
+        console.error('Render pipeline creation error:', error);
+        throw error;
+    }
+}
+
+// Run render shader to draw the triangle
+function runRenderShader() {
+    try {
+        // Get current texture from canvas
+        const currentTexture = gpuState.context.getCurrentTexture();
         
+        // Create render pass descriptor
+        const renderPassDescriptor = {
+            label: 'Triangle render pass',
+            colorAttachments: [{
+                view: currentTexture.createView(),
+                clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+                loadOp: 'clear',
+                storeOp: 'store'
+            }]
+        };
+
+        // Create command encoder
+        const encoder = gpuState.device.createCommandEncoder({
+            label: 'Triangle command encoder'
+        });
+
+        // Create render pass
+        const renderPass = encoder.beginRenderPass(renderPassDescriptor);
+        
+        // Set pipeline, bind group, and vertex buffer
+        renderPass.setPipeline(renderPipeline);
+        renderPass.setBindGroup(0, bindGroup);
+        renderPass.setVertexBuffer(0, vertexBuffer);
+        
+        // Draw triangle
+        renderPass.draw(3);
+        
+        // End render pass
+        renderPass.end();
+
+        // Submit commands
+        gpuState.device.queue.submit([encoder.finish()]);
+    } catch (error) {
+        showErrorToast(`Render shader error: ${error.message}`);
+        console.error('Render shader error:', error);
+    }
+}
+
+// Update function to render the triangle
+function update() {
+    try {
+        // Run render shader to draw triangle
+        if (renderPipeline) {
+            runRenderShader();
+        }
+
+        // Request next frame
+        requestAnimationFrame(update);
+    } catch (error) {
+        showErrorToast(`Render error: ${error.message}`);
+        console.error('Render error:', error);
+        setTimeout(() => {
+            requestAnimationFrame(update);
+        }, 100);
+    }
+}
+
+// Initialize WebGPU
+async function init() {
+    try {
+        // Initialize device and context
+        await initDeviceAndContext();
+
+        // Configure context
+        configureContext();
+
         // Create uniform buffer
         createUniformsBuffer();
         
         // Create vertex buffer
         createVertexBuffer();
+
+        // Create render pipeline
+        await createRenderPipeline();
+        
+        // Create bind group
+        createBindGroup();
         
         // Start render loop
         update();
