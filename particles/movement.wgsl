@@ -37,6 +37,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // Get current circle data
     var circle = circles[index];
     
+    // Simulate physics
     // Calculate intermolecular acceleration
     circle.acceleration = vec2<f32>(0.0, 0.0);
     

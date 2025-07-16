@@ -15,7 +15,7 @@ let renderPipeline; // The render pipeline for drawing the circles
 let computePipeline; // The compute pipeline for moving the circles
 let vertexBuffer; // The vertex buffer containing circle geometry
 let indexBuffer; // The index buffer for circle triangles
-let circleBuffer; // The buffer containing circle data (position, color, velocity)
+let circleBuffer; // The buffer containing circle data (position, velocity, acceleration, color)
 let uniformsBuffer; // The uniforms buffer for screen resolution
 let timeBuffer; // The time buffer for delta time
 let bindGroup; // The bind group for passing uniforms to the shader
@@ -27,7 +27,7 @@ const CIRCLE_RADIUS = 5;
 const CIRCLE_SEGMENTS = 16; // Number of triangles to approximate a circle
 const CIRCLE_SPAWN_RADIUS = 1.5 * CIRCLE_RADIUS; // Minimum distance between circles
 const SPEED = 60.0; // Movement speed in pixels per second
-let circles = []; // Array to store circle data (position, color, velocity)
+let circles = []; // Array to store circle data (position, velocity, acceleration, color)
 
 // Gravity state
 let isGravityReversed = false;
@@ -481,7 +481,7 @@ function runComputeShader(deltaTime) {
         computePass.setBindGroup(0, computeBindGroup);
 
         // Dispatch compute shader
-        const workgroupSize = 64;
+        const workgroupSize = 128;
         const numWorkgroups = Math.ceil(num_circles / workgroupSize);
         computePass.dispatchWorkgroups(numWorkgroups);
 

@@ -32,10 +32,10 @@ fn vs_main(input: VertexInput) -> FragmentInput {
     let circle = circles[input.instance_index];
     
     // Transform local vertex position to world position
-    let worldPos = input.position + circle.position;
+    let world_pos = input.position + circle.position;
     
     // Convert pixel coordinates to normalized device coordinates
-    let ndc = (worldPos / uniforms.resolution) * 2.0 - 1.0;
+    let ndc = (world_pos / uniforms.resolution) * 2.0 - 1.0;
     let flipped_ndc = vec2<f32>(ndc.x, -ndc.y);
     
     out.position = vec4<f32>(flipped_ndc, 0.0, 1.0);
