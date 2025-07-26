@@ -1,6 +1,6 @@
-# WebGPU Summer Workshop: Synthetic Animation & Simulation in the Browser
+# WebGPU Workshop: Synthetic Animation & Simulation in the Browser
 
-This repository holds the code and resources for the WebGPU Summer Workshop, focusing on creating synthetic animations in the browser using WebGPU.
+This repository holds the code and resources for the WebGPU Workshop, focusing on creating synthetic animations in the browser using WebGPU.
 
 This README provides all the materials for the workshop.
 
@@ -36,7 +36,7 @@ To get started with the workshop, follow these steps:
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/LioQing/webgpu-summer-workshop-2025.git
+   git clone https://github.com/LioQing/webgpu-workshop-2025.git
    ```
 2. Checkout the `scaffold` branch:
    ```bash
@@ -77,15 +77,15 @@ Then, let's take a look at what a render pipeline looks like:
 ```mermaid
 graph LR
     subgraph Application
-    A[Create Pipeline] --> B[Create Buffer]
+       A[Create Pipeline] --> B[Create Buffer]
     end
     subgraph Render Pipeline
-    B --> C[Vertex Shader]
-    C --> D[Fragment Shader]
+       B --> C[Vertex Shader]
+       C --> D[Fragment Shader]
     end
     subgraph Render Targets
-    D --> E[Screen]
-    D --> F[Image]
+       D --> E[Screen]
+       D --> F[Image]
     end
 ```
 
@@ -181,99 +181,110 @@ async function init() {
 }
 ```
 
-We can break down the code into several key parts:
+We can break down the code into several key parts.
 
-1. Initializing the device and context
-   ```javascript
-   // Initialize device and context
-   await initDeviceAndContext();
-   
-   // Configure context
-   configureContext();
-   ```
-    - Device represents the GPU which lets us create resources and run shaders.
-    - Context is an object that tells the GPU to render to a specific canvas.
-    - [utils.js](./utils.js) contains utility functions to initialize them so we can focus on the rendering logic instead of the setup.
-2. Create the buffers
-   ```javascript
-   // Create uniform buffer
-   createUniformsBuffer();
-   
-   // Create vertex buffer
-   createVertexBuffer();
-   ```
-    - We create buffers to store uniforms and vertices.
-    - The uniforms hold the screen resolution for reason that will be explained in [the next section](#triangle-render-shader).
-    - The vertex buffer holds the vertex positions and colors of the triangle.
-    - The buffers are created using the device's [`createBuffer`](https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBuffer) method.
-    - The buffers are then written to using the device queue's [`writeBuffer`](https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/writeBuffer) method.
-    - Queues are used to submit commands/instructions to the GPU, they are not executed immediately, but rather scheduled for execution later using the [`submit`](https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/submit) method.
-3. Create the render pipeline and bind group
-   ```javascript
-   // Create render pipeline
-   await createRenderPipeline();
-   
-   // Create bind group
-   createBindGroup();
-   ```
-    - The render pipeline is created using the device's [`createRenderPipeline`](https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline) method.
-    - In the pipeline descriptor, we need to specify the vertex and fragment shaders, the bind group layout, and the topology of the geometry.
-    - WebGPU API in JavaScript allows us to automatically detect the shader's bind group layout, which simplifies a lot of the boilerplate code.
-    - The topology is set to `triangle-list`, which will render every 3 vertices as a triangle.
-    - The bind group is created using the device's [`createBindGroup`](https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroup) method, which binds the buffers to the pipeline.
-4. Finally, we update every frame to render the triangle, which also responds to canvas resize
-   ```javascript
-   // Run render shader to draw triangle
-   if (renderPipeline) {
-       runRenderShader();
-   }
+#### 1. Initializing the device and context
 
-   // Request next frame
-   requestAnimationFrame(update);
-   ```
-    - To run the shader, we need to call the device's [`createCommandEncoder`](https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createCommandEncoder) method to create a [`GPUCommandEncoder`](https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder), and then use the encoder's [`beginRenderPass`](https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/beginRenderPass) method to create a render pass.
-    - The render pass is where we specify the render targets (the canvas) and the bind group to use.
-    - We will use the pass' [`setPipeline`](https://developer.mozilla.org/en-US/docs/Web/API/GPURenderPassEncoder/setPipeline) method to set the render pipeline, the [`setBindGroup`](https://developer.mozilla.org/en-US/docs/Web/API/GPURenderPassEncoder/setBindGroup) method to set the bind group, the [`setVertexBuffer`](https://developer.mozilla.org/en-US/docs/Web/API/GPURenderPassEncoder/setVertexBuffer) method to set the vertex buffer, and finally the [`draw`](https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/draw) method to draw the triangle.
-    ```javascript
-    // Run render shader to draw the triangle
-    function runRenderShader() {
-        // Get current texture from canvas
-        const currentTexture = gpuState.context.getCurrentTexture();
-        
-        // Create render pass descriptor
-        const renderPassDescriptor = {
-            label: 'Triangle render pass',
-            colorAttachments: [{
-                view: currentTexture.createView(),
-                clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
-                loadOp: 'clear',
-                storeOp: 'store'
-            }]
-        };
+```javascript
+// Initialize device and context
+await initDeviceAndContext();
 
-        // Create command encoder
-        const encoder = gpuState.device.createCommandEncoder({
-            label: 'Triangle command encoder'
-        });
+// Configure context
+configureContext();
+```
 
-        // Create render pass
-        const renderPass = encoder.beginRenderPass(renderPassDescriptor);
-        
-        // Set pipeline, bind group, and vertex buffer
-        renderPass.setPipeline(renderPipeline);
-        renderPass.setBindGroup(0, bindGroup);
-        renderPass.setVertexBuffer(0, vertexBuffer);
-        
-        // Draw triangle
-        renderPass.draw(3);
-        
-        // End render pass
-        renderPass.end();
+- Device represents the GPU which lets us create resources and run shaders.
+- Context is an object that tells the GPU to render to a specific canvas.
+- [utils.js](./utils.js) contains utility functions to initialize them so we can focus on the rendering logic instead of the setup.
 
-        // Submit commands
-        gpuState.device.queue.submit([encoder.finish()]);
-    }
-    ```
+#### 2. Create the buffers
+
+```javascript
+// Create uniform buffer
+createUniformsBuffer();
+
+// Create vertex buffer
+createVertexBuffer();
+```
+
+- We create buffers to store uniforms and vertices.
+- The uniforms hold the screen resolution for reason that will be explained in [the next section](#triangle-render-shader).
+- The vertex buffer holds the vertex positions and colors of the triangle.
+- The buffers are created using the device's [`createBuffer`](https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBuffer) method.
+- The buffers are then written to using the device queue's [`writeBuffer`](https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/writeBuffer) method.
+- Queues are used to submit commands/instructions to the GPU, they are not executed immediately, but rather scheduled for execution later using the [`submit`](https://developer.mozilla.org/en-US/docs/Web/API/GPUQueue/submit) method.
+
+#### 3. Create the render pipeline and bind group
+
+```javascript
+// Create render pipeline
+await createRenderPipeline();
+
+// Create bind group
+createBindGroup();
+```
+
+- The render pipeline is created using the device's [`createRenderPipeline`](https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createRenderPipeline) method.
+- In the pipeline descriptor, we need to specify the vertex and fragment shaders, the bind group layout, and the topology of the geometry.
+- WebGPU API in JavaScript allows us to automatically detect the shader's bind group layout, which simplifies a lot of the boilerplate code.
+- The topology is set to `triangle-list`, which will render every 3 vertices as a triangle.
+- The bind group is created using the device's [`createBindGroup`](https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createBindGroup) method, which binds the buffers to the pipeline.
+
+#### 4. Run the shader every frame
+
+```javascript
+// Run render shader to draw triangle
+if (renderPipeline) {
+    runRenderShader();
+}
+
+// Request next frame
+requestAnimationFrame(update);
+```
+
+- To run the shader, we need to call the device's [`createCommandEncoder`](https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createCommandEncoder) method to create a [`GPUCommandEncoder`](https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder), and then use the encoder's [`beginRenderPass`](https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/beginRenderPass) method to create a render pass.
+- The render pass is where we specify the render targets (the canvas) and the bind group to use.
+- We will use the pass' [`setPipeline`](https://developer.mozilla.org/en-US/docs/Web/API/GPURenderPassEncoder/setPipeline) method to set the render pipeline, the [`setBindGroup`](https://developer.mozilla.org/en-US/docs/Web/API/GPURenderPassEncoder/setBindGroup) method to set the bind group, the [`setVertexBuffer`](https://developer.mozilla.org/en-US/docs/Web/API/GPURenderPassEncoder/setVertexBuffer) method to set the vertex buffer, and finally the [`draw`](https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/draw) method to draw the triangle.
+```javascript
+// Run render shader to draw the triangle
+function runRenderShader() {
+    // Get current texture from canvas
+    const currentTexture = gpuState.context.getCurrentTexture();
+    
+    // Create render pass descriptor
+    const renderPassDescriptor = {
+        label: 'Triangle render pass',
+        colorAttachments: [{
+            view: currentTexture.createView(),
+            clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            loadOp: 'clear',
+            storeOp: 'store'
+        }]
+    };
+
+    // Create command encoder
+    const encoder = gpuState.device.createCommandEncoder({
+        label: 'Triangle command encoder'
+    });
+
+    // Create render pass
+    const renderPass = encoder.beginRenderPass(renderPassDescriptor);
+    
+    // Set pipeline, bind group, and vertex buffer
+    renderPass.setPipeline(renderPipeline);
+    renderPass.setBindGroup(0, bindGroup);
+    renderPass.setVertexBuffer(0, vertexBuffer);
+    
+    // Draw triangle
+    renderPass.draw(3);
+    
+    // End render pass
+    renderPass.end();
+
+    // Submit commands
+    gpuState.device.queue.submit([encoder.finish()]);
+}
+```
 
 ### Triangle Render Shader
 
@@ -313,61 +324,69 @@ fn fs_main(input: FragmentInput) -> @location(0) vec4<f32> {
 }
 ```
 
-We can take a look at each part of the shader:
+We can take a look at each part of the shader.
 
-1. Define structs and bind groups
-    ```wgsl
-    struct Uniforms {
-         resolution: vec2<f32>,
-    }
+#### 1. Define structs and bind groups
+
+```wgsl
+struct Uniforms {
+        resolution: vec2<f32>,
+}
+
+struct VertexInput {
+        @location(0) position: vec2<f32>,
+        @location(1) color: vec3<f32>,
+}
+
+struct FragmentInput {
+        @builtin(position) position: vec4<f32>,
+        @location(0) color: vec3<f32>,
+}
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+```
+
+- We define a `Uniforms` struct to hold the screen resolution.
+- The `VertexInput` struct holds the vertex position and color, while the `FragmentInput` struct holds the position and color for the fragment shader.
+- The `@location` attribute specifies the input/output locations for the vertex and fragment shaders.
+- The `@builtin(position)` attribute specifies that the position is a built-in output for the vertex shader, which will be used to determine where the vertex is drawn on the screen.
+- These structs must match the layout of the buffers we created in JavaScript.
+- The `@group` and `@binding` attributes specify the group and binding of the buffer, which lets us to organize our resources.
+
+#### 2. Calculate normalized device coordinates (NDC) in the vertex shader
+
+```wgsl
+@vertex
+fn vs_main(input: VertexInput) -> FragmentInput {
+    var out: FragmentInput;
     
-    struct VertexInput {
-         @location(0) position: vec2<f32>,
-         @location(1) color: vec3<f32>,
-    }
+    let ndc = (input.position / uniforms.resolution) * 2.0 - 1.0;
+    let flipped_ndc = vec2<f32>(ndc.x, -ndc.y);
     
-    struct FragmentInput {
-         @builtin(position) position: vec4<f32>,
-         @location(0) color: vec3<f32>,
-    }
-    
-    @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-    ```
-     - We define a `Uniforms` struct to hold the screen resolution.
-     - The `VertexInput` struct holds the vertex position and color, while the `FragmentInput` struct holds the position and color for the fragment shader.
-     - The `@location` attribute specifies the input/output locations for the vertex and fragment shaders.
-     - The `@builtin(position)` attribute specifies that the position is a built-in output for the vertex shader, which will be used to determine where the vertex is drawn on the screen.
-     - These structs must match the layout of the buffers we created in JavaScript.
-     - The `@group` and `@binding` attributes specify the group and binding of the buffer, which lets us to organize our resources.
-2. Calculate normalized device coordinates (NDC) in the vertex shader
-   ```wgsl
-   @vertex
-   fn vs_main(input: VertexInput) -> FragmentInput {
-       var out: FragmentInput;
-       
-       let ndc = (input.position / uniforms.resolution) * 2.0 - 1.0;
-       let flipped_ndc = vec2<f32>(ndc.x, -ndc.y);
-       
-       out.position = vec4<f32>(flipped_ndc, 0.0, 1.0);
-       out.color = input.color;
-       return out;
-   }
-   ```
-    - The vertex shader function is annotated with `@vertex`.
-    - The vertex shader takes the `VertexInput` and outputs `FragmentInput`.
-    - It converts the vertex position from pixel coordinates to normalized device coordinates(NDC) by scaling it to the range [-1, 1] with the given screen resolution in the uniforms buffer.
-    - The color is passed directly to the fragment shader.
-3. Simply output the color in the fragment shader
-   ```wgsl
-   @fragment
-   fn fs_main(input: FragmentInput) -> @location(0) vec4<f32> {
-       return vec4<f32>(input.color, 1.0);
-   }
-   ```
-    - The fragment shader function is annotated with `@fragment`.
-    - The fragment shader takes the `FragmentInput` and outputs a color.
-    - It simply returns the color with an alpha value of 1.0 (fully opaque).
-    - The color will be linearly interpolated between the vertices of the triangle, which is the default behavior in most graphics APIs.
+    out.position = vec4<f32>(flipped_ndc, 0.0, 1.0);
+    out.color = input.color;
+    return out;
+}
+```
+
+- The vertex shader function is annotated with `@vertex`.
+- The vertex shader takes the `VertexInput` and outputs `FragmentInput`.
+- It converts the vertex position from pixel coordinates to normalized device coordinates(NDC) by scaling it to the range [-1, 1] with the given screen resolution in the uniforms buffer.
+- The color is passed directly to the fragment shader.
+
+#### 3. Simply output the color in the fragment shader
+
+```wgsl
+@fragment
+fn fs_main(input: FragmentInput) -> @location(0) vec4<f32> {
+    return vec4<f32>(input.color, 1.0);
+}
+```
+
+- The fragment shader function is annotated with `@fragment`.
+- The fragment shader takes the `FragmentInput` and outputs a color.
+- It simply returns the color with an alpha value of 1.0 (fully opaque).
+- The color will be linearly interpolated between the vertices of the triangle, which is the default behavior in most graphics APIs.
 
 ### Triangle
 
@@ -542,7 +561,13 @@ async function init() {
 }
 ```
 
-We can see the structure is actually very similar to the rendering code, only that we have two pipelines: one for rendering and one for computing. We just need to use the device's [`createComputePipeline`](https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createComputePipeline) method to create the compute pipeline, and then use the encoder's [`beginComputePass`](https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/beginComputePass) method to create a compute pass.
+#### Overview of the structure
+
+We can see the structure is actually very similar to the rendering code, only that we have two pipelines:
+- Render pipeline for rendering the circles.
+- Compute pipeline for simulating the movement of the circles.
+
+#### Instancing and indexed rendering
 
 Since in this program we are rendering a lot of circles, we can use instancing to render them efficiently by passing the number of instances as the second argument to the [`draw`](https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/draw) or [`drawIndexed`](https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/drawIndexed) method.
 
@@ -574,11 +599,20 @@ function runRenderShader() {
 }
 ```
 
+#### Flow of the compute pipeline
+
 For the compute shader, it is very similar as well.
 
-The only difference is that we begin the pass with [`beginComputePass`](https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/beginComputePass) and we run it with the encoder's [`dispatchWorkgroups`](https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/dispatchWorkgroups) method, which takes the number of workgroups to run in parallel.
+The only difference is that:
+- We use the device's [`createComputePipeline`](https://developer.mozilla.org/en-US/docs/Web/API/GPUDevice/createComputePipeline) method to create the compute pipeline.
+- We begin the pass with [`beginComputePass`](https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/beginComputePass).
+- We run it with the encoder's [`dispatchWorkgroups`](https://developer.mozilla.org/en-US/docs/Web/API/GPUCommandEncoder/dispatchWorkgroups) method, which takes the number of workgroups to run in parallel.
+
+#### What are workgroups?
 
 GPUs execute compute shaders in groups of threads called workgroups. In this case, we are setting the workgroup size to 128, this number need to match that defined in the [compute shader](#particle-movement-compute-shader). Since the circles need to be updated in groups, we take the ceil of the number of circles divided by the workgroup size to get the number of workgroups to run, and do not process anything for threads with their index larger than the number of circles.
+
+#### Delta time for physics simulation
 
 Note that we are also passing the delta time to the compute shader, so that we can multiply the speed by the time to get the distance moved by each circle in that frame. You can see that it is in a different uniform buffer called `timeBuffer` rather than the `uniformsBuffer` we used in the render shader, this is good for separating data that is needed in different pipelines and shaders.
 
@@ -676,9 +710,13 @@ fn fs_main(input: FragmentInput) -> @location(0) vec4<f32> {
 }
 ```
 
+#### Accessing circle data
+
 We can see that the vertex shader is very similar to the triangle vertex shader, but we are using the `instance_index` to get the circle data from the `circles` storage buffer, which is an array of `Circle` structs that we defined earlier.
 
 Storage buffers are defined by same way as uniform buffers, but we need to define `var<storage, read>` to indicate that it is a storage buffer that can be read by the shader. The `Circle` struct contains the position, velocity, acceleration, and color of each circle.
+
+#### Transforming local to world positions
 
 Looking at how `world_pos` is defined, we can see that it is the sum of the local vertex position and the circle's position, this is the process of local to world positions transformation, which is a common practice in graphics programming.
 
@@ -740,11 +778,19 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 }
 ```
 
+#### Declarations in the compute shader
+
 First, while the bind group declarations are similar to the render shader, we have an additional `delta_time` uniform buffer to pass the delta time to the compute shader. We also specify `var<storage, read_write>` for the `circles` storage buffer, which allows us to read and write the circle data in the shader as we update their positions, velocity, and acceleration.
+
+#### Specifying the workgroup size
 
 Next, notice that we have a `@compute` annotation on the shader function, which indicates that this is a compute shader. We also specify the workgroup size to be 128 via `@workgroup_size(128)`, which matches what we used in the JavaScript code when dispatching the compute shader.
 
+#### Getting the global invocation ID for accessing circles
+
 Since there is no vertex input, we use the `@builtin(global_invocation_id)` built-in variable to get the global invocation ID, which is a unique ID for each thread running the compute shader. This is basically the index of the current thread regardless of the workgroup, so we can use it to index into the `circles` array.
+
+#### Simulating Physics
 
 After that, it's just a matter of defining constants and doing physics simulation, which is a lot of fun! Try to play around with the constants and code to see how the simulation behaves. One important thing to note is that since everything is executed in parallel, we should avoid race conditions, where multiple threads try to write to the same data at the same time.
 
