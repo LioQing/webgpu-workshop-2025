@@ -30,7 +30,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let index = global_id.x;
     let num_circles = arrayLength(&circles);
     
-    if (index >= num_circles) {
+    if index >= num_circles {
         return;
     }
     
@@ -43,7 +43,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     
     // Check force with nearby particles
     for (var i: u32 = 0u; i < num_circles; i += 1) {
-        if (i == index) {
+        if i == index {
             continue; // Skip self
         }
         
@@ -58,7 +58,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
         let inter_force = 4 * INTER_EPISILON * (strong_force - weak_force);
 
-        if (r <= CIRCLE_RADIUS * 2.0) {
+        if r <= CIRCLE_RADIUS * 2.0 {
             continue;
         }
 
@@ -73,7 +73,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     circle.velocity += circle.acceleration * delta_time;
 
     // Clamp velocity to prevent physics breaking
-    if (length(circle.velocity) > MAX_SPEED) {
+    if length(circle.velocity) > MAX_SPEED {
         circle.velocity = normalize(circle.velocity) * MAX_SPEED;
     }
 
@@ -86,23 +86,23 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     
     // Check boundaries and bounce
     // Left boundary
-    if (circle.position.x - CIRCLE_RADIUS < 0.0) {
+    if circle.position.x - CIRCLE_RADIUS < 0.0 {
         circle.position.x = CIRCLE_RADIUS;
         circle.velocity.x = -circle.velocity.x;
     }
     // Right boundary
-    else if (circle.position.x + CIRCLE_RADIUS > uniforms.resolution.x) {
+    else if circle.position.x + CIRCLE_RADIUS > uniforms.resolution.x {
         circle.position.x = uniforms.resolution.x - CIRCLE_RADIUS;
         circle.velocity.x = -circle.velocity.x;
     }
     
     // Top boundary
-    if (circle.position.y - CIRCLE_RADIUS < 0.0) {
+    if circle.position.y - CIRCLE_RADIUS < 0.0 {
         circle.position.y = CIRCLE_RADIUS;
         circle.velocity.y = -circle.velocity.y;
     }
     // Bottom boundary
-    else if (circle.position.y + CIRCLE_RADIUS > uniforms.resolution.y) {
+    else if circle.position.y + CIRCLE_RADIUS > uniforms.resolution.y {
         circle.position.y = uniforms.resolution.y - CIRCLE_RADIUS;
         circle.velocity.y = -circle.velocity.y;
     }

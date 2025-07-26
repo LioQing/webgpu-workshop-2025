@@ -1,4 +1,4 @@
-# WebGPU Summer Workshop: Synthetic Animation in the Browser
+# WebGPU Summer Workshop: Synthetic Animation & Simulation in the Browser
 
 This repository holds the code and resources for the WebGPU Summer Workshop, focusing on creating synthetic animations in the browser using WebGPU.
 
@@ -393,6 +393,7 @@ First, let's learn some new terms which we will use in this part of the workshop
       vertex = vertices[index]
       # Do something with the vertex
   ```
+  ![indexed](./media/indexed.png)
 - **Instancing**: a technique for render pipeline to render multiple geometries with the same vertex buffer, we can use the instance index to access the instance's own data in whatever buffer we want.
   ```python
   for instance_index in range(num_instances):

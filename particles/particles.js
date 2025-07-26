@@ -25,7 +25,7 @@ let computeBindGroup; // The bind group for the compute pipeline
 let num_circles = 128;
 const CIRCLE_RADIUS = 5;
 const CIRCLE_SEGMENTS = 16; // Number of triangles to approximate a circle
-const CIRCLE_SPAWN_RADIUS = 1.5 * CIRCLE_RADIUS; // Minimum distance between circles
+const CIRCLE_SPAWN_RADIUS = 4 * CIRCLE_RADIUS; // Minimum distance between circles
 const SPEED = 60.0; // Movement speed in pixels per second
 let circles = []; // Array to store circle data (position, velocity, acceleration, color)
 
@@ -150,9 +150,9 @@ function createVertexBuffer() {
 // Generate random circles
 function generateCircles() {
     // We divide the canvas into a grid of circles and store whether each circle is occupied
-    const occupied = new Array(Math.floor(htmlState.canvas.width / (2 * CIRCLE_SPAWN_RADIUS)))
+    const occupied = new Array(Math.floor(htmlState.canvas.width / CIRCLE_SPAWN_RADIUS))
         .fill(false)
-        .map(() => new Array(Math.floor(htmlState.canvas.height / (2 * CIRCLE_SPAWN_RADIUS)))
+        .map(() => new Array(Math.floor(htmlState.canvas.height / CIRCLE_SPAWN_RADIUS))
             .fill(false)
         );
 
@@ -163,8 +163,8 @@ function generateCircles() {
         do {
             gridX = Math.floor(Math.random() * occupied.length);
             gridY = Math.floor(Math.random() * occupied[0].length);
-            x = gridX * 2 * CIRCLE_SPAWN_RADIUS + CIRCLE_SPAWN_RADIUS;
-            y = gridY * 2 * CIRCLE_SPAWN_RADIUS + CIRCLE_SPAWN_RADIUS;
+            x = gridX * CIRCLE_SPAWN_RADIUS + CIRCLE_RADIUS;
+            y = gridY * CIRCLE_SPAWN_RADIUS + CIRCLE_RADIUS;
         } while (occupied[gridX] && occupied[gridX][gridY]);
 
         const r = Math.random() * 0.5 + 0.5; // Random red component (0.5 to 1.0)
@@ -530,6 +530,12 @@ async function restartSimulation(newNumCircles) {
 // Initialize WebGPU
 async function init() {
     try {
+        // Show loading indicator
+        const loadingContainer = document.getElementById('loading-container');
+        if (loadingContainer) {
+            loadingContainer.classList.remove('hidden');
+        }
+        
         // Initialize device and context
         await initDeviceAndContext();
 
@@ -559,7 +565,13 @@ async function init() {
         
         // Start render loop
         update();
+        
+        // Hide loading indicator
+        if (loadingContainer) {
+            loadingContainer.classList.add('hidden');
+        }
     } catch (error) {
+        hideLoading();
         showErrorToast(`Error: ${error.message}`);
         console.error('WebGPU Error:', error);
     }

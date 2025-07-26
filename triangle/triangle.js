@@ -246,6 +246,12 @@ function update() {
 // Initialize WebGPU
 async function init() {
     try {
+        // Show loading indicator
+        const loadingContainer = document.getElementById('loading-container');
+        if (loadingContainer) {
+            loadingContainer.classList.remove('hidden');
+        }
+        
         // Initialize device and context
         await initDeviceAndContext();
 
@@ -266,7 +272,13 @@ async function init() {
         
         // Start render loop
         update();
+        
+        // Hide loading indicator
+        if (loadingContainer) {
+            loadingContainer.classList.add('hidden');
+        }
     } catch (error) {
+        hideLoading();
         showErrorToast(`Error: ${error.message}`);
         console.error('WebGPU Error:', error);
     }
