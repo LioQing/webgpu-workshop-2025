@@ -29,19 +29,61 @@ const CIRCLE_SPAWN_RADIUS = 4 * CIRCLE_RADIUS; // Minimum distance between circl
 const SPEED = 60.0; // Movement speed in pixels per second
 let circles = []; // Array to store circle data (position, velocity, acceleration, color)
 
-// Gravity state
-let isGravityReversed = false;
+// Interaction state
+let mousePosition = { x: 0, y: 0 }; // Current mouse position
+let isMouseDown = false;
+let gravityDirection = 0.0; // 0 for none, -1 for downward, 1 for upward
 
-// Update gravity status display
-function updateGravityDisplay() {
+// Update gravity state
+function updateGravity() {
+    if (gravityDirection == 0) {
+        gravityDirection = -1.0;
+    } else if (gravityDirection == -1) {
+        gravityDirection = 1.0;
+    } else {
+        gravityDirection = 0.0;
+    }
+    updateUniformsBuffer();
+
     const gravityStatus = document.getElementById('gravity-status');
     if (gravityStatus) {
-        if (isGravityReversed) {
+        // Remove all gravity classes
+        gravityStatus.classList.remove('none', 'upward', 'downward');
+        
+        if (gravityDirection == 0) {
+            gravityStatus.textContent = 'Gravity: None';
+            gravityStatus.classList.add('none');
+        } else if (gravityDirection == 1) {
             gravityStatus.textContent = 'Gravity: Upward';
-            gravityStatus.classList.add('reversed');
+            gravityStatus.classList.add('upward');
         } else {
             gravityStatus.textContent = 'Gravity: Downward';
-            gravityStatus.classList.remove('reversed');
+            gravityStatus.classList.add('downward');
+        }
+    }
+}
+
+// Update mouse position and button state
+function updateMousePosition(event, overrideDown = null) {
+    if (overrideDown !== null) {
+        isMouseDown = overrideDown;
+        return;
+    }
+
+    const rect = htmlState.canvas.getBoundingClientRect();
+    mousePosition.x = event.clientX - rect.left;
+    mousePosition.y = event.clientY - rect.top;
+    isMouseDown = event.buttons > 0;
+    updateUniformsBuffer();
+    
+    const mouseStatus = document.getElementById('mouse-status');
+    if (mouseStatus) {
+        if (isMouseDown) {
+            mouseStatus.textContent = `Mouse: (${Math.round(mousePosition.x)}, ${Math.round(mousePosition.y)})`;
+            mouseStatus.classList.add('active');
+        } else {
+            mouseStatus.textContent = 'Mouse: None';
+            mouseStatus.classList.remove('active');
         }
     }
 }
@@ -61,13 +103,13 @@ function resizeCanvas() {
         updateCircleBuffer();
     }
 }
-
+  
 // Create uniforms buffer for screen resolution
 function createUniformsBuffer() {
     try {
         uniformsBuffer = gpuState.device.createBuffer({
             label: 'Uniform buffer',
-            size: 4 * 4, // resolution (width, height) (2 floats) + is_gravity_reversed (1 int) + padding (1 float)
+            size: 8 * 4, // resolution (width, height) (2 floats) + mouse position (2 floats) + is_mouse_down (1 int) + gravity direction (1 float) + padding (2 float)
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         });
         
@@ -85,7 +127,11 @@ function updateUniformsBuffer() {
         const uniformData = new Float32Array([
             htmlState.canvas.width, 
             htmlState.canvas.height,
-            isGravityReversed ? 1.0 : 0.0,
+            mousePosition.x,
+            mousePosition.y,
+            isMouseDown ? 1.0 : 0.0,
+            gravityDirection,
+            0.0,
             0.0
         ]);
         gpuState.device.queue.writeBuffer(uniformsBuffer, 0, uniformData);
@@ -595,13 +641,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add resize event listener
     window.addEventListener('resize', resizeCanvas);
 
+    // Add mouse event listeners
+    htmlState.canvas.addEventListener('mousemove', updateMousePosition);
+    htmlState.canvas.addEventListener('mousedown', updateMousePosition);
+    htmlState.canvas.addEventListener('mouseup', updateMousePosition);
+    htmlState.canvas.addEventListener('mouseleave', (event) => {
+        updateMousePosition(event, false);
+    });
+
     // Add spacebar event listener for gravity reversal
     document.addEventListener('keydown', (event) => {
         if (event.code === 'Space') {
             event.preventDefault();
-            isGravityReversed = !isGravityReversed;
-            updateUniformsBuffer();
-            updateGravityDisplay();
+            updateGravity();
         }
     });
 
@@ -627,9 +679,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize canvas size
     resizeCanvas();
-    
-    // Initialize gravity display
-    updateGravityDisplay();
     
     // Initialize WebGPU
     init();

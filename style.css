@@ -256,16 +256,52 @@ footer p {
 #gravity-status {
     font-size: 1.1rem;
     font-weight: 600;
-    color: #45b7d1;
+    color: #aaaaaa;
     margin-bottom: 8px;
     transition: color 0.3s ease;
 }
 
-#gravity-status.reversed {
+#gravity-status.none {
+    color: #aaaaaa;
+}
+
+#gravity-status.upward {
+    color: #a2ff4a;
+}
+
+#gravity-status.downward {
     color: #ff6b6b;
 }
 
 .gravity-instruction {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-style: italic;
+}
+
+.mouse-info {
+    text-align: left;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    border: solid 1px white;
+    border-radius: 8px;
+    padding: 16px;
+    font-family: Arial, sans-serif;
+}
+
+#mouse-status {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #aaaaaa;
+    margin-bottom: 8px;
+    transition: color 0.3s ease;
+}
+
+#mouse-status.active {
+    color: #a2ff4a;
+}
+
+.mouse-instruction {
     font-size: 0.9rem;
     color: rgba(255, 255, 255, 0.8);
     font-style: italic;

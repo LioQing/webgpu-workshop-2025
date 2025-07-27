@@ -114,28 +114,28 @@ let uniformsBuffer; // The uniforms buffer for screen resolution
 let bindGroup; // The bind group for passing uniforms to the shader
 
 // Resize the canvas and update buffers
-function resizeCanvas()
+function resizeCanvas();
 
 // Create uniforms buffer for screen resolution
-function createUniformsBuffer()
+function createUniformsBuffer();
 
 // Update uniforms buffer with current canvas resolution
-function updateUniformsBuffer()
+function updateUniformsBuffer();
 
 // Create vertex buffer
-function createVertexBuffer()
+function createVertexBuffer();
 
 // Update vertex buffer with current canvas resolution
-function updateVertexBuffer()
+function updateVertexBuffer();
 
 // Create bind group for render pipeline
-function createBindGroup()
+function createBindGroup();
 
 // Create render pipeline for triangle rendering
-async function createRenderPipeline()
+async function createRenderPipeline();
 
 // Run render shader to draw the triangle
-function runRenderShader()
+function runRenderShader();
 
 // Update function to render the triangle
 function update() {
@@ -447,55 +447,60 @@ const SPEED = 60.0; // Movement speed in pixels per second
 let circles = []; // Array to store circle data (position, color, velocity)
 
 // Gravity state
-let isGravityReversed = false;
+let mousePosition = { x: 0, y: 0 }; // Current mouse position
+let isMouseDown = false;
+let gravityDirection = 0.0; // 0 for none, -1 for downward, 1 for upward
 
-// Update gravity status display
-function updateGravityDisplay()
+// Update gravity state
+function updateGravity();
+
+// Update mouse position and button state
+function updateMousePosition(event, overrideDown = null);
 
 // Resize the canvas and update buffers
-function resizeCanvas()
+function resizeCanvas();
 
 // Create uniforms buffer for screen resolution
-function createUniformsBuffer()
+function createUniformsBuffer();
 
 // Update uniforms buffer with current canvas resolution
-function updateUniformsBuffer()
+function updateUniformsBuffer();
 
 // Create vertex buffer for circle geometry
-function createVertexBuffer()
+function createVertexBuffer();
 
 // Generate random circles
-function generateCircles()
+function generateCircles();
 
 // Create circle buffer for circle data
-function createCircleBuffer()
+function createCircleBuffer();
 
 // Update circle buffer with current circle data
-function updateCircleBuffer()
+function updateCircleBuffer();
 
 // Create time buffer for delta time
-function createTimeBuffer()
+function createTimeBuffer();
 
 // Update time buffer with delta time
-function updateTimeBuffer(deltaTime)
+function updateTimeBuffer(deltaTime);
 
 // Create render pipeline for particle rendering
-async function createRenderPipeline()
+async function createRenderPipeline();
 
 // Create compute pipeline for particle movement
-async function createComputePipeline()
+async function createComputePipeline();
 
 // Create bind groups for render and compute pipelines
-function createBindGroups()
+function createBindGroups();
 
 // Run render shader to draw particles
-function runRenderShader()
+function runRenderShader();
 
 // Run compute shader to update particle positions
-function runComputeShader(deltaTime)
+function runComputeShader(deltaTime);
 
 // Restart simulation with new number of circles
-async function restartSimulation(newNumCircles)
+async function restartSimulation(newNumCircles);
 
 // Update function to render the circles
 let lastTime = 0;
@@ -727,8 +732,10 @@ For the most fun part, we are going to look at the compute shader that simulates
 ```wgsl
 struct Uniforms {
     resolution: vec2<f32>,
-    is_gravity_reversed: u32,
-    padding: u32,
+    mouse_position: vec2<f32>,
+    is_mouse_down: u32,
+    gravity_direction: f32,
+    padding: vec2<f32>,
 }
 
 struct Circle {
@@ -744,13 +751,7 @@ struct Circle {
 @group(0) @binding(1) var<storage, read_write> circles: array<Circle>;
 @group(0) @binding(2) var<uniform> delta_time: f32;
 
-const CIRCLE_RADIUS: f32 = 5.0;
-const INTER_EPISILON: f32 = 100.0;
-const INTER_SIGMA: f32 = CIRCLE_RADIUS * 8;
-const MAX_SPEED: f32 = 1000.0;
-const DAMPING: f32 = 0.999;
-const DAMP_FREE_SPEED: f32 = 100.0;
-const GRAVITY: f32 = 9.81 * 1000.0;
+// ...
 
 @compute @workgroup_size(128)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -801,6 +802,22 @@ You may have noticed already that in the page there are two panels to control th
 We can make real-time changes to our simulation by either creating new buffers or updating existing ones. For example when we change the number of circles, we can simply call the `restartSimulation` function to create a new circle buffer with the new number of circles and update the render pipeline to use the new buffer.
 
 ```javascript
+    // Add mouse event listeners
+    htmlState.canvas.addEventListener('mousemove', updateMousePosition);
+    htmlState.canvas.addEventListener('mousedown', updateMousePosition);
+    htmlState.canvas.addEventListener('mouseup', updateMousePosition);
+    htmlState.canvas.addEventListener('mouseleave', (event) => {
+        isMouseDown = false;
+    });
+
+    // Add spacebar event listener for gravity reversal
+    document.addEventListener('keydown', (event) => {
+        if (event.code === 'Space') {
+            event.preventDefault();
+            updateGravity();
+        }
+    });
+
     // Add event listeners for circle controls
     const numCirclesInput = document.getElementById('num-circles-input');
     const applyButton = document.getElementById('apply-circles');

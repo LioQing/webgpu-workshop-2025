@@ -1,7 +1,9 @@
 struct Uniforms {
     resolution: vec2<f32>,
-    is_gravity_reversed: u32,
-    padding: u32,
+    mouse_position: vec2<f32>,
+    is_mouse_down: u32,
+    gravity_direction: f32,
+    padding: vec2<f32>,
 }
 
 struct Circle {
@@ -20,10 +22,11 @@ struct Circle {
 const CIRCLE_RADIUS: f32 = 5.0;
 const INTER_EPISILON: f32 = 100.0;
 const INTER_SIGMA: f32 = CIRCLE_RADIUS * 8;
+const MAX_ACCEL: f32 = 10000.0;
 const MAX_SPEED: f32 = 1000.0;
 const DAMPING: f32 = 0.999;
-const DAMP_FREE_SPEED: f32 = 100.0;
-const GRAVITY: f32 = 9.81 * 1000.0;
+const MOUSE_RADIUS: f32 = CIRCLE_RADIUS * 50.0;
+const GRAVITY: f32 = -9.81 * 1000.0;
 
 @compute @workgroup_size(128)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -50,24 +53,39 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         let other_circle = circles[i];
         let offset = other_circle.position - circle.position;
         let direction = normalize(offset);
-        let r = length(offset);
+        let distance = length(offset);
 
-        let inter_term = INTER_SIGMA / r;
+        let inter_term = INTER_SIGMA / distance;
         let weak_force = inter_term * inter_term * inter_term;
         let strong_force = weak_force * weak_force;
 
         let inter_force = 4 * INTER_EPISILON * (strong_force - weak_force);
 
-        if r <= CIRCLE_RADIUS * 2.0 {
+        if distance <= CIRCLE_RADIUS * 2.0 {
             continue;
         }
 
         circle.acceleration -= direction * inter_force;
     }
 
+    // Apply mouse interaction
+    if uniforms.is_mouse_down != 0u {
+        let mouse_offset = uniforms.mouse_position - circle.position;
+        let mouse_distance = length(mouse_offset);
+        
+        let term = MOUSE_RADIUS / mouse_distance;
+        let force = term * term * term * term * term * term;
+        let direction = normalize(mouse_offset);
+        circle.acceleration -= direction * force;
+    }
+
     // Apply gravity
-    let gravity_direction = select(1.0, -1.0, uniforms.is_gravity_reversed != 0u);
-    circle.acceleration += vec2<f32>(0.0, GRAVITY * gravity_direction) * delta_time;
+    circle.acceleration += vec2<f32>(0.0, GRAVITY * uniforms.gravity_direction) * delta_time;
+
+    // Clamp acceleration to prevent physics breaking
+    if length(circle.acceleration) > MAX_ACCEL {
+        circle.acceleration = normalize(circle.acceleration) * MAX_ACCEL;
+    }
 
     // Apply acceleration to velocity
     circle.velocity += circle.acceleration * delta_time;
@@ -78,8 +96,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     }
 
     // Dampen the velocity depending on its current speed
-    circle.velocity *= DAMPING
-        + min((1.0 - DAMPING) / (1.0 + length(circle.velocity) - DAMP_FREE_SPEED), 1.0);
+    circle.velocity *= DAMPING;
     
     // Update position using velocity and delta time
     circle.position += circle.velocity * delta_time;
