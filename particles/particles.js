@@ -302,8 +302,8 @@ function update(currentTime = 0) {
 
         // Run compute shader to update particle positions
         // Cap delta time to prevent large jumps and ensure minimum time has passed
-        if (computePipeline && deltaTime > 0.001 && deltaTime < 0.1) {
-            runComputeShader(deltaTime);
+        if (computePipeline && deltaTime > 0.001) {
+            runComputeShader(Math.min(deltaTime, 0.1));
         }
 
         // Run render shader to draw particles
