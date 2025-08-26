@@ -85,11 +85,11 @@ function updateVertexBuffer() {
         
         const vertices = new Float32Array([
             // Top red vertex
-            centerX, centerY - size,  1.0, 0.0, 0.0,
+            centerX, centerY - size, 1.0, 0.0, 0.0,
             // Bottom left green vertex
-            centerX - size, centerY + size,  0.0, 1.0, 0.0,
+            centerX - size, centerY + size, 0.0, 1.0, 0.0,
             // Bottom right blue vertex
-            centerX + size, centerY + size,  0.0, 0.0, 1.0
+            centerX + size, centerY + size, 0.0, 0.0, 1.0
         ]);
 
         gpuState.device.queue.writeBuffer(vertexBuffer, 0, vertices);

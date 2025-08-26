@@ -330,17 +330,17 @@ We can take a look at each part of the shader.
 
 ```wgsl
 struct Uniforms {
-        resolution: vec2<f32>,
+    resolution: vec2<f32>,
 }
 
 struct VertexInput {
-        @location(0) position: vec2<f32>,
-        @location(1) color: vec3<f32>,
+    @location(0) position: vec2<f32>,
+    @location(1) color: vec3<f32>,
 }
 
 struct FragmentInput {
-        @builtin(position) position: vec4<f32>,
-        @location(0) color: vec3<f32>,
+    @builtin(position) position: vec4<f32>,
+    @location(0) color: vec3<f32>,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -416,10 +416,10 @@ First, let's learn some new terms which we will use in this part of the workshop
 - **Instancing**: a technique for render pipeline to render multiple geometries with the same vertex buffer, we can use the instance index to access the instance's own data in whatever buffer we want.
   ```python
   for instance_index in range(num_instances):
-    for index in indices:
-        vertex = vertices[index]
-        our_instance_data = our_instance_buffer[instance_index]
-        # Do something with the vertex and instance data
+      for index in indices:
+          vertex = vertices[index]
+          our_instance_data = our_instance_buffer[instance_index]
+          # Do something with the vertex and instance data
   ```
 
 ### WebGPU Compute API
