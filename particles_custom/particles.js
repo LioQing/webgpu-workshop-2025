@@ -20,6 +20,10 @@ let uniformsBuffer; // The uniforms buffer for screen resolution
 let timeBuffer; // The time buffer for delta time
 let bindGroup; // The bind group for passing uniforms to the shader
 let computeBindGroup; // The bind group for the compute pipeline
+let computeBGL; // Explicit compute bind group layout
+let computePipelineLayout; // Explicit compute pipeline layout
+// Keep a copy of the original movement.wgsl to support Reset
+let originalMovementSource = '';
 
 // Circle configuration
 let num_circles = 128;
@@ -33,15 +37,6 @@ let circles = []; // Array to store circle data (position, velocity, acceleratio
 let mousePosition = { x: 0, y: 0 }; // Current mouse position
 let isMouseDown = false;
 let gravityDirection = 0.0; // 0 for none, -1 for downward, 1 for upward
-let useGPU = true; // true => GPU mode, false => CPU mode
-
-// Update mode UI
-function updateModeUI() {
-    const modeStatus = document.getElementById('mode-status');
-    const toggleBtn = document.getElementById('toggle-mode');
-    if (modeStatus) modeStatus.textContent = `Mode: ${useGPU ? 'GPU' : 'CPU'}`;
-    if (toggleBtn) toggleBtn.textContent = useGPU ? 'Switch to CPU' : 'Switch to GPU';
-}
 
 // Update gravity state
 function updateGravity() {
@@ -326,12 +321,7 @@ function update(currentTime = 0) {
         // Run compute shader to update particle positions
         // Cap delta time to prevent large jumps and ensure minimum time has passed
         if (computePipeline && deltaTime > 0.001) {
-            const cappedDt = Math.min(deltaTime, 0.1);
-            if (useGPU) {
-                runComputeShader(cappedDt);
-            } else {
-                runCPUSimuation(cappedDt);
-            }
+            runComputeShader(Math.min(deltaTime, 0.1));
         }
 
         // Run render shader to draw particles
@@ -424,10 +414,13 @@ async function createComputePipeline() {
 
         validateShader(computeShaderCode);
 
-        // Create compute pipeline
+        // Ensure explicit layouts exist
+        ensureComputeLayouts();
+
+        // Create compute pipeline with explicit layout
         computePipeline = gpuState.device.createComputePipeline({
             label: 'Movement compute pipeline',
-            layout: 'auto',
+            layout: computePipelineLayout,
             compute: {
                 module: computeShaderModule,
                 entryPoint: 'main'
@@ -460,11 +453,11 @@ function createBindGroups() {
             ]
         });
 
-        // Create compute bind group
-        const computeBindGroupLayout = computePipeline.getBindGroupLayout(0);
+        // Create compute bind group using explicit layout
+        ensureComputeLayouts();
         computeBindGroup = gpuState.device.createBindGroup({
             label: 'Compute bind group',
-            layout: computeBindGroupLayout,
+            layout: computeBGL,
             entries: [
                 {
                     binding: 0,
@@ -570,124 +563,108 @@ function runComputeShader(deltaTime) {
     }
 }
 
-function runCPUSimuation(deltaTime) {
+// Recompile compute pipeline from WGSL code in the editor sidebar
+async function recompileComputeFromEditor() {
     try {
-        const INTER_EPISILON = 100.0;
-        const INTER_SIGMA = CIRCLE_RADIUS * 8.0;
-        const MAX_ACCEL = 10000.0;
-        const MAX_SPEED = 1000.0;
-        const DAMPING = 0.999;
-        const MOUSE_RADIUS = CIRCLE_RADIUS * 50.0;
-        const GRAVITY = -9.81 * 1000.0;
-
-        const width = htmlState.canvas.width;
-        const height = htmlState.canvas.height;
-        const n = Math.min(num_circles, circles.length);
-        const prev = circles;
-        const next = new Array(n);
-
-        // Small epsilon to avoid division by zero
-        const EPS = 1e-5;
-
-        for (let i = 0; i < n; i++) {
-            const c = prev[i];
-            let ax = 0.0, ay = 0.0;
-
-            // Inter-particle forces (Lennard-Jones-like)
-            for (let j = 0; j < n; j++) {
-                if (j === i) continue;
-                const o = prev[j];
-
-                const dx = o.x - c.x;
-                const dy = o.y - c.y;
-                const distSq = dx * dx + dy * dy;
-                const dist = Math.sqrt(distSq);
-                if (dist <= CIRCLE_RADIUS * 2.0) continue;
-
-                const invDist = 1.0 / Math.max(dist, EPS);
-                const dirx = dx * invDist;
-                const diry = dy * invDist;
-
-                const interTerm = INTER_SIGMA * invDist;
-                const weak = interTerm * interTerm * interTerm; // ^3
-                const strong = weak * weak; // ^6
-                const interForce = 4.0 * INTER_EPISILON * (strong - weak);
-
-                ax -= dirx * interForce;
-                ay -= diry * interForce;
-            }
-
-            // Mouse interaction (attractive)
-            if (isMouseDown) {
-                const mdx = mousePosition.x - c.x;
-                const mdy = mousePosition.y - c.y;
-                const mdist = Math.sqrt(mdx * mdx + mdy * mdy);
-                const invMDist = 1.0 / Math.max(mdist, EPS);
-                const dirx = mdx * invMDist;
-                const diry = mdy * invMDist;
-                const term = MOUSE_RADIUS * invMDist;
-                const force = term * term * term * term * term * term; // ^6
-                ax -= dirx * force;
-                ay -= diry * force;
-            }
-
-            // Gravity (note: multiplied by deltaTime here to match WGSL)
-            ay += GRAVITY * gravityDirection * deltaTime;
-
-            // Clamp acceleration
-            const aLen = Math.hypot(ax, ay);
-            if (aLen > MAX_ACCEL) {
-                const scale = MAX_ACCEL / aLen;
-                ax *= scale;
-                ay *= scale;
-            }
-
-            // Integrate velocity
-            let vx = c.vx + ax * deltaTime;
-            let vy = c.vy + ay * deltaTime;
-
-            // Clamp velocity
-            const vLen = Math.hypot(vx, vy);
-            if (vLen > MAX_SPEED) {
-                const scale = MAX_SPEED / vLen;
-                vx *= scale;
-                vy *= scale;
-            }
-
-            // Damping
-            vx *= DAMPING;
-            vy *= DAMPING;
-
-            // Integrate position
-            let x = c.x + vx * deltaTime;
-            let y = c.y + vy * deltaTime;
-
-            // Bounds and bounce
-            if (x - CIRCLE_RADIUS < 0.0) {
-                x = CIRCLE_RADIUS;
-                vx = -vx;
-            } else if (x + CIRCLE_RADIUS > width) {
-                x = width - CIRCLE_RADIUS;
-                vx = -vx;
-            }
-
-            if (y - CIRCLE_RADIUS < 0.0) {
-                y = CIRCLE_RADIUS;
-                vy = -vy;
-            } else if (y + CIRCLE_RADIUS > height) {
-                y = height - CIRCLE_RADIUS;
-                vy = -vy;
-            }
-
-            next[i] = { x, y, vx, vy, ax, ay, r: c.r, g: c.g, b: c.b };
+        const codeEl = document.getElementById('shader-code');
+        if (!codeEl) return;
+        const code = codeEl.textContent || '';
+        if (!code.trim()) {
+            showErrorToast('Shader source is empty.');
+            return;
         }
 
-        // Swap and sync to GPU buffer
-        circles = next;
-        updateCircleBuffer();
+        // Create shader module and validate
+        const module = gpuState.device.createShaderModule({
+            label: 'Movement compute shader (live)',
+            code
+        });
+        const info = await module.getCompilationInfo();
+        const errors = info.messages.filter(m => m.type === 'error');
+        if (errors.length > 0) {
+            const lines = code.split('\n');
+            let html = 'Shader Errors:';
+            for (const m of errors) {
+                html += `\n<pre>`;
+                html += `\n${m.message}`;
+                if (m.lineNum !== undefined && m.linePos !== undefined) {
+                    const lineNumber = m.lineNum;
+                    const col = m.linePos;
+                    const errorLine = lines[lineNumber - 1] || '';
+                    const esc = document.createElement('div');
+                    esc.textContent = errorLine;
+                    const safeLine = esc.innerHTML;
+                    html += `\n ${lineNumber} | ${safeLine}`;
+                    const underline = '^'.repeat(Math.max(1, m.length || 1));
+                    html += `\n ${' '.repeat(String(lineNumber).length)} | ${' '.repeat(Math.max(0, col - 1))}${underline}`;
+                }
+                html += `\n</pre>`;
+            }
+            showErrorToast(html, true, true);
+            return;
+        }
+
+        // Ensure explicit layouts exist
+        ensureComputeLayouts();
+
+        // Build new pipeline with explicit layout
+        const newPipeline = gpuState.device.createComputePipeline({
+            label: 'Movement compute pipeline (live)',
+            layout: computePipelineLayout,
+            compute: { module, entryPoint: 'main' }
+        });
+
+        // Recreate compute bind group using explicit layout
+        const newBindGroup = gpuState.device.createBindGroup({
+            label: 'Compute bind group (live)',
+            layout: computeBGL,
+            entries: [
+                { binding: 0, resource: { buffer: uniformsBuffer } },
+                { binding: 1, resource: { buffer: circleBuffer } },
+                { binding: 2, resource: { buffer: timeBuffer } }
+            ]
+        });
+
+        // Swap in on success
+        computePipeline = newPipeline;
+        computeBindGroup = newBindGroup;
+        console.log('Compute pipeline recompiled successfully.');
     } catch (error) {
-        showErrorToast(`CPU simulation error: ${error.message}`);
-        console.error('CPU simulation error:', error);
+        showErrorToast(`Recompile failed: ${error.message}`);
+        console.error('Recompile failed:', error);
+    }
+}
+
+// Ensure explicit compute bind group and pipeline layouts are created
+function ensureComputeLayouts() {
+    if (!gpuState.device) return;
+    if (!computeBGL) {
+        computeBGL = gpuState.device.createBindGroupLayout({
+            label: 'Compute BGL (uniforms, storage, time)',
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: { type: 'uniform' }
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: { type: 'storage' }
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: { type: 'uniform' }
+                }
+            ]
+        });
+    }
+    if (!computePipelineLayout) {
+        computePipelineLayout = gpuState.device.createPipelineLayout({
+            label: 'Compute Pipeline Layout',
+            bindGroupLayouts: [computeBGL]
+        });
     }
 }
 
@@ -775,7 +752,6 @@ async function init() {
 // Initialize everything when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     initElements();
-    updateModeUI();
     
     // Add global error handlers
     window.addEventListener('error', (event) => {
@@ -802,6 +778,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add spacebar event listener for gravity reversal
     document.addEventListener('keydown', (event) => {
         if (event.code === 'Space') {
+            const ae = document.activeElement;
+            const isEditable = ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/i.test(ae.tagName));
+            if (isEditable) return; // let space insert in editors/inputs
             event.preventDefault();
             updateGravity();
         }
@@ -810,7 +789,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add event listeners for circle controls
     const numCirclesInput = document.getElementById('num-circles-input');
     const applyButton = document.getElementById('apply-circles');
-    const toggleModeBtn = document.getElementById('toggle-mode');
     
     if (numCirclesInput && applyButton) {
         applyButton.addEventListener('click', () => {
@@ -828,16 +806,307 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (toggleModeBtn) {
-        toggleModeBtn.addEventListener('click', () => {
-            useGPU = !useGPU;
-            updateModeUI();
-        });
-    }
-
     // Initialize canvas size
     resizeCanvas();
     
     // Initialize WebGPU
     init();
+
+    // Fetch movement.wgsl and display it in the sidebar
+    (async () => {
+        try {
+            const codeEl = document.getElementById('shader-code');
+            if (!codeEl) return;
+            const res = await fetch('movement.wgsl');
+            if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+            const text = await res.text();
+            originalMovementSource = text;
+            codeEl.textContent = text;
+            if (window.Prism && typeof window.Prism.highlightElement === 'function') {
+                window.Prism.highlightElement(codeEl);
+            }
+        } catch (err) {
+            const codeEl = document.getElementById('shader-code');
+            if (codeEl) codeEl.textContent = `/* Failed to load movement.wgsl: ${err.message} */`;
+            console.error('Failed to load movement.wgsl:', err);
+        }
+    })();
+
+    // Sidebar resize interactions
+    const sidebar = document.getElementById('shader-sidebar');
+    const resizer = document.getElementById('shader-resizer');
+    const root = document.documentElement;
+
+    // Restore saved sidebar width
+    const savedWidth = localStorage.getItem('shaderSidebarWidth');
+    if (savedWidth) {
+        const desired = parseInt(savedWidth, 10) || 0;
+        const finalWidth = Math.max(320, desired);
+        root.style.setProperty('--shader-sidebar-width', `${finalWidth}px`);
+    }
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    function onPointerDown(clientX) {
+        if (!sidebar) return;
+        isResizing = true;
+        startX = clientX;
+        startWidth = sidebar.getBoundingClientRect().width;
+        document.body.classList.add('shader-resizing');
+    }
+
+    function onPointerMove(clientX) {
+        if (!isResizing || !sidebar) return;
+        const dx = startX - clientX;
+        let newWidth = startWidth + dx;
+        newWidth = Math.max(320, newWidth);
+        const px = `${Math.round(newWidth)}px`;
+        root.style.setProperty('--shader-sidebar-width', px);
+    }
+
+    function onPointerUp() {
+        if (!isResizing) return;
+        isResizing = false;
+        document.body.classList.remove('shader-resizing');
+        // Persist width
+        const current = getComputedStyle(document.documentElement).getPropertyValue('--shader-sidebar-width').trim();
+        if (current) localStorage.setItem('shaderSidebarWidth', current);
+    }
+
+    if (resizer) {
+        // Mouse
+        resizer.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            onPointerDown(e.clientX);
+        });
+        window.addEventListener('mousemove', (e) => onPointerMove(e.clientX));
+        window.addEventListener('mouseup', onPointerUp);
+        // Touch
+        resizer.addEventListener('touchstart', (e) => {
+            if (e.touches && e.touches[0]) {
+                onPointerDown(e.touches[0].clientX);
+            }
+        }, { passive: true });
+        window.addEventListener('touchmove', (e) => {
+            if (e.touches && e.touches[0]) onPointerMove(e.touches[0].clientX);
+        }, { passive: true });
+        window.addEventListener('touchend', onPointerUp);
+        window.addEventListener('touchcancel', onPointerUp);
+    }
+
+    // Confirm button: print code to console
+    const confirmBtn = document.getElementById('shader-confirm');
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+            const codeEl = document.getElementById('shader-code');
+            const code = codeEl ? codeEl.textContent || '' : '';
+            console.log('WGSL code (movement.wgsl):\n\n' + code);
+            recompileComputeFromEditor();
+        });
+    }
+
+    // Reset button: restore original movement.wgsl into the editor
+    const resetBtn = document.getElementById('shader-reset');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            const codeEl = document.getElementById('shader-code');
+            if (!codeEl) return;
+            if (!originalMovementSource) {
+                showErrorToast('Original shader not loaded yet.');
+                return;
+            }
+            codeEl.textContent = originalMovementSource;
+            if (window.Prism && typeof window.Prism.highlightElement === 'function') {
+                try {
+                    window.Prism.highlightElement(codeEl, false);
+                } catch (_) {
+                    window.Prism.highlightElement(codeEl);
+                }
+            }
+            console.log('WGSL code reset to original movement.wgsl');
+        });
+    }
+
+    // Re-highlight code as user edits to keep Prism formatting
+    const codeEditable = document.getElementById('shader-code');
+    if (codeEditable && window.Prism && typeof window.Prism.highlightElement === 'function') {
+        // Helpers to get/set caret offset within a contenteditable element
+        const getCaretOffset = (el) => {
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return null;
+            const range = sel.getRangeAt(0);
+            // Only handle collapsed selections (caret). If not collapsed, use start.
+            const pre = range.cloneRange();
+            pre.selectNodeContents(el);
+            try {
+                pre.setEnd(range.startContainer, range.startOffset);
+            } catch (_) {
+                return null;
+            }
+            return pre.toString().length;
+        };
+
+        const getSelectionOffsets = (el) => {
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return { start: null, end: null };
+            const range = sel.getRangeAt(0);
+            const preStart = range.cloneRange();
+            preStart.selectNodeContents(el);
+            try { preStart.setEnd(range.startContainer, range.startOffset); } catch (_) { return { start: null, end: null }; }
+            const start = preStart.toString().length;
+            const preEnd = range.cloneRange();
+            preEnd.selectNodeContents(el);
+            try { preEnd.setEnd(range.endContainer, range.endOffset); } catch (_) { return { start: null, end: null }; }
+            const end = preEnd.toString().length;
+            return { start, end };
+        };
+
+        const setCaretOffset = (el, offset) => {
+            if (offset == null) return;
+            const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+            let node = walker.nextNode();
+            let count = 0;
+            while (node) {
+                const next = count + node.nodeValue.length;
+                if (offset <= next) {
+                    const range = document.createRange();
+                    range.setStart(node, Math.max(0, offset - count));
+                    range.collapse(true);
+                    const sel = window.getSelection();
+                    if (sel) {
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                    return;
+                }
+                count = next;
+                node = walker.nextNode();
+            }
+            // Fallback to end
+            const sel = window.getSelection();
+            if (sel) {
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+        };
+
+        let rehighlightRaf = 0;
+        const schedule = () => {
+            if (rehighlightRaf) cancelAnimationFrame(rehighlightRaf);
+            rehighlightRaf = requestAnimationFrame(() => {
+                const activeIsCode = document.activeElement === codeEditable;
+                const offset = activeIsCode ? getCaretOffset(codeEditable) : null;
+                // Prefer synchronous highlighting to keep caret snappy
+                try {
+                    window.Prism.highlightElement(codeEditable, false);
+                } catch (_) {
+                    window.Prism.highlightElement(codeEditable);
+                }
+                if (activeIsCode) {
+                    const safeOffset = Math.min(offset ?? 0, (codeEditable.textContent || '').length);
+                    setCaretOffset(codeEditable, safeOffset);
+                }
+            });
+        };
+        codeEditable.addEventListener('input', schedule);
+        codeEditable.addEventListener('paste', schedule);
+        codeEditable.addEventListener('keyup', (e) => {
+            // rehighlight after structural edits
+            if (['Enter', 'Tab', 'Backspace', 'Delete'].includes(e.key)) schedule();
+        });
+
+        // Insert a literal tab on Tab key; implement Ctrl/Cmd C/X/V shortcuts
+        codeEditable.addEventListener('keydown', async (e) => {
+            // Tab inserts a tab character
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const { start, end } = getSelectionOffsets(codeEditable);
+                if (start == null || end == null) return;
+                const text = codeEditable.textContent || '';
+                const before = text.slice(0, Math.min(start, end));
+                const after = text.slice(Math.max(start, end));
+                const next = before + '\t' + after;
+                codeEditable.textContent = next;
+                // Place caret after inserted tab, then re-highlight and preserve caret
+                const newOffset = Math.min(before.length + 1, next.length);
+                setCaretOffset(codeEditable, newOffset);
+                schedule();
+                return;
+            }
+
+            // Ctrl/Cmd shortcuts for copy, cut, paste
+            const isAccel = e.ctrlKey || e.metaKey;
+            if (!isAccel) return;
+            const key = e.key.toLowerCase();
+            if (!['c', 'x', 'v'].includes(key)) return;
+
+            const { start, end } = getSelectionOffsets(codeEditable);
+            const hasSel = start != null && end != null && end > start;
+            const text = codeEditable.textContent || '';
+
+            // Helper to set content and caret, then re-highlight
+            const setContent = (newText, caretOffset) => {
+                codeEditable.textContent = newText;
+                setCaretOffset(codeEditable, Math.max(0, Math.min(caretOffset, newText.length)));
+                schedule();
+            };
+
+            try {
+                if (key === 'c') {
+                    if (!hasSel) return; // nothing to copy
+                    const selected = text.slice(start, end);
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(selected);
+                        e.preventDefault();
+                    } else if (document.execCommand) {
+                        // Fallback: let the browser handle default copy
+                        // We avoid preventDefault so native copy can proceed
+                    }
+                } else if (key === 'x') {
+                    if (!hasSel) return; // nothing to cut
+                    const selected = text.slice(start, end);
+                    let copied = false;
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(selected);
+                        copied = true;
+                    } else if (document.execCommand) {
+                        // Try native cut; if it succeeds we can bail
+                        const ok = document.execCommand('cut');
+                        if (ok) {
+                            // Native cut already altered content; schedule highlight and exit
+                            schedule();
+                            return;
+                        }
+                    }
+                    // Perform manual cut and prevent default
+                    const before = text.slice(0, start);
+                    const after = text.slice(end);
+                    setContent(before + after, start);
+                    e.preventDefault();
+                } else if (key === 'v') {
+                    // Paste plain text at caret or replace selection
+                    if (navigator.clipboard && navigator.clipboard.readText) {
+                        e.preventDefault();
+                        const clip = await navigator.clipboard.readText();
+                        const s = Math.min(start ?? 0, end ?? 0);
+                        const epos = Math.max(start ?? 0, end ?? 0);
+                        const before = text.slice(0, s);
+                        const after = text.slice(epos);
+                        const next = before + clip + after;
+                        setContent(next, before.length + clip.length);
+                    } else {
+                        // Allow default paste behaviour and re-highlight via existing paste/input handlers
+                    }
+                }
+            } catch (err) {
+                console.warn('Clipboard operation failed:', err);
+                // Fall back to default browser behaviour
+            }
+        });
+    }
 });

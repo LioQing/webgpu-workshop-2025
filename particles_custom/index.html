@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebGPU Particles</title>
     <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="prism.css" />
 </head>
 <body>
     <div class="back-button-container">
@@ -12,10 +13,6 @@
     </div>
     <div id="fps-counter" class="fps-counter" aria-live="polite" title="Frames per second">FPS: --</div>
     <div class="controls-container">
-        <div class="circle-controls mode-controls">
-            <div id="mode-status">Mode: GPU</div>
-            <button id="toggle-mode" class="apply-button">Switch to CPU</button>
-        </div>
         <div class="circle-controls">
             <label for="num-circles-input">Number of Circles:</label>
             <input type="number" id="num-circles-input" min="1" max="10000" value="128">
@@ -31,12 +28,25 @@
         </div>
     </div>
     <canvas id="canvas"></canvas>
+    <aside id="shader-sidebar" class="shader-sidebar" aria-label="WGSL source">
+        <div id="shader-resizer" class="shader-resizer" aria-hidden="true"></div>
+        <div class="shader-header">movement.wgsl</div>
+    <pre class="shader-pre"><code id="shader-code" class="language-wgsl" contenteditable="true" spellcheck="false" aria-label="Editable WGSL source">/* loading movement.wgsl… */</code></pre>
+        <div class="shader-footer">
+            <button id="shader-confirm" class="apply-button">Confirm</button>
+            <button id="shader-reset" class="apply-button" title="Restore original movement.wgsl">Reset</button>
+        </div>
+    </aside>
     <div id="loading-container" class="loading-container">
         <div class="loading-spinner"></div>
         <div class="loading-text">Loading WebGPU...</div>
     </div>
-    <div id="error-toast" class="error-toast"></div>
+    <div id="error-toast" class="error-toast" role="alert" aria-live="assertive">
+        <button type="button" class="toast-close" aria-label="Close">×</button>
+        <div class="toast-content"></div>
+    </div>
     <script type="module" src="particles.js"></script>
     <script type="module" src="utils.js"></script>
+    <script src="prism.js"></script>
 </body>
 </html>
