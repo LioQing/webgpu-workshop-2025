@@ -2,7 +2,7 @@
 
 This repository holds the code and resources for the WebGPU Workshop, focusing on creating synthetic animations in the browser using WebGPU.
 
-This README provides all the materials for the workshop.
+This README provides a more in-depth details of the concepts and all the code.
 
 ## Introduction
 
@@ -15,39 +15,6 @@ While there is [WebGL](https://developer.mozilla.org/en-US/docs/Glossary/WebGL) 
 > WebGPU is still in development and not yet widely supported in all browsers. Check the [WebGPU implementation status page](https://github.com/gpuweb/gpuweb/wiki/Implementation-Status) for the latest updates on browser support.
 >
 > At the time of writing, WebGPU is only generally available in chromium-based browsers like Chrome and Edge. Firefox and Safari require enabling experimental features to use WebGPU.
-
-## Workshop Overview
-
-This workshop is designed for anyone with a basic understanding of programming. We will explore the WebGPU API and how to use it to create graphics and interactive animations in the browser. Therefore, most of the code has already been implemented for you, you will only need to fill in the most essential parts.
-
-This workshop is structured as follows:
-
-1. Implement traditional render pipeline that renders a simple triangle.
-2. Implement compute pipeline to simulate physics.
-3. Implement interaction with the simulation to create a synthetic animation.
-
-> [!NOTE]
->
-> This workshop will only focus on the WebGPU API in JavaScript in the [triangle](./triangle/) and [particles](./particles/) pages, we will not cover the basics of web development like HTML and CSS.
-
-## Getting Started
-
-To get started with the workshop, follow these steps:
-
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/LioQing/webgpu-workshop-2025.git
-   ```
-2. Checkout the `scaffold` branch:
-   ```bash
-   git checkout scaffold
-   ```
-3. Open the `index.html` file in a browser.
-    - If you are using Visual Studio Code, you can install the [Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer) extension to see changes in real-time.
-    - If you are using another editor, you can use Python's built-in HTTP server:
-      ```bash
-      python -m http.server 8000
-      ```
 
 > [!NOTE]
 >

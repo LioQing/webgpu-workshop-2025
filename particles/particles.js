@@ -555,7 +555,7 @@ function runComputeShader(deltaTime) {
         computePass.setBindGroup(0, computeBindGroup);
 
         // Dispatch compute shader
-        const workgroupSize = 128;
+        const workgroupSize = gpuState.device.limits.maxComputeWorkgroupSizeX;
         const numWorkgroups = Math.ceil(num_circles / workgroupSize);
         computePass.dispatchWorkgroups(numWorkgroups);
 

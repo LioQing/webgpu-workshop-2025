@@ -24,6 +24,8 @@ let computeBGL; // Explicit compute bind group layout
 let computePipelineLayout; // Explicit compute pipeline layout
 // Keep a copy of the original movement.wgsl to support Reset
 let originalMovementSource = '';
+// Keep a copy of the empty template movement_empty.wgsl to support Empty button (lazy loaded)
+let emptyMovementSource = '';
 
 // Circle configuration
 let num_circles = 128;
@@ -548,7 +550,7 @@ function runComputeShader(deltaTime) {
         computePass.setBindGroup(0, computeBindGroup);
 
         // Dispatch compute shader
-        const workgroupSize = 128;
+        const workgroupSize = gpuState.device.limits.maxComputeWorkgroupSizeX;
         const numWorkgroups = Math.ceil(num_circles / workgroupSize);
         computePass.dispatchWorkgroups(numWorkgroups);
 
@@ -926,6 +928,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             console.log('WGSL code reset to original movement.wgsl');
+        });
+    }
+
+    // Empty button: load movement_empty.wgsl template into the editor
+    const emptyBtn = document.getElementById('shader-empty');
+    if (emptyBtn) {
+        emptyBtn.addEventListener('click', async () => {
+            const codeEl = document.getElementById('shader-code');
+            if (!codeEl) return;
+            try {
+                if (!emptyMovementSource) {
+                    const res = await fetch('movement_empty.wgsl');
+                    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+                    emptyMovementSource = await res.text();
+                }
+                codeEl.textContent = emptyMovementSource;
+                if (window.Prism && typeof window.Prism.highlightElement === 'function') {
+                    try {
+                        window.Prism.highlightElement(codeEl, false);
+                    } catch (_) {
+                        window.Prism.highlightElement(codeEl);
+                    }
+                }
+                console.log('WGSL code loaded from movement_empty.wgsl');
+            } catch (err) {
+                showErrorToast(`Failed to load movement_empty.wgsl: ${err.message}`);
+                console.error('Failed to load movement_empty.wgsl:', err);
+            }
         });
     }
 
